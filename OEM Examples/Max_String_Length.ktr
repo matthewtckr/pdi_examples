@@ -6,7 +6,7 @@
     <extended_description/>
     <trans_version/>
     <trans_type>Normal</trans_type>
-    <directory>&#x2f;home&#x2f;mtucker</directory>
+    <directory>&#x2f;</directory>
     <parameters>
     </parameters>
     <log>
@@ -69,7 +69,7 @@
   <created_date>2017&#x2f;04&#x2f;03 09&#x3a;30&#x3a;58.008</created_date>
   <modified_user>-</modified_user>
   <modified_date>2017&#x2f;04&#x2f;03 09&#x3a;30&#x3a;58.008</modified_date>
-    <key_for_session_key/>
+    <key_for_session_key>H4sIAAAAAAAAAAMAAAAAAAAAAAA&#x3d;</key_for_session_key>
     <is_key_private>N</is_key_private>
   </info>
   <notepads>
@@ -77,90 +77,6 @@
   <order>
   <hop> <from>Data Grid</from><to>Max String Length</to><enabled>Y</enabled> </hop>
   </order>
-  <step>
-    <name>Max String Length</name>
-    <type>UserDefinedJavaClass</type>
-    <description/>
-    <distribute>Y</distribute>
-    <custom_distribution/>
-    <copies>1</copies>
-         <partitioning>
-           <method>none</method>
-           <schema_name/>
-           </partitioning>
-
-    <definitions>
-        <definition>
-        <class_type>TRANSFORM_CLASS</class_type>
-
-        <class_name>Processor</class_name>
-
-        <class_source><![CDATA[import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.HashMap;
-
-List columns = new ArrayList();
-Map maxStrings = new HashMap();
-
-public boolean processRow(StepMetaInterface smi, StepDataInterface sdi) throws KettleException {
-	Object[] r = getRow();
-
-	if (r == null) {
-      if ( getInputRowMeta() != null ) {
-        for ( int i = 0; i < columns.size(); i++ ) {
-          int index = (Integer) columns.get(i);
-          String fieldName = getInputRowMeta().getValueMeta(index).getName();
-          int maxLength = (Integer) maxStrings.get( index );
-          logBasic( fieldName + ": " + maxLength );
-        }
-      }
-
-	  setOutputDone();
-	  return false;
-	}
-
-	if (first){
-	  first = false;
-      RowMetaInterface rm = getInputRowMeta();
-      for ( int i = 0; i < rm.size(); i++ ) {
-        if ( rm.getValueMeta(i).getType() == ValueMetaInterface.TYPE_STRING ) {
-          columns.add( i );
-          maxStrings.put( i, -1 );
-        }
-      }
-	}
-
-	// It is always safest to call createOutputRow() to ensure that your output row's Object[] is large
-    // enough to handle any new fields you are creating in this step.
-    r = createOutputRow(r, data.outputRowMeta.size());
-	
-    for ( int i = 0; i < columns.size(); i++ ) {
-      int index = (Integer) columns.get(i);
-      String olddata = (String) r[index];
-      if ( olddata != null && olddata.length() > (Integer) maxStrings.get( index ) ) {
-        maxStrings.put( index, olddata.length() );
-      }
-    }
-
-	// Send the row on to the next step.
-    putRow(data.outputRowMeta, r);
-
-	return true;
-}
-]]></class_source>
-        </definition>
-    </definitions>
-    <fields>
-    </fields><clear_result_fields>N</clear_result_fields>
-<info_steps></info_steps><target_steps></target_steps><usage_parameters></usage_parameters>     <cluster_schema/>
- <remotesteps>   <input>   </input>   <output>   </output> </remotesteps>    <GUI>
-      <xloc>448</xloc>
-      <yloc>326</yloc>
-      <draw>Y</draw>
-      </GUI>
-    </step>
-
   <step>
     <name>Data Grid</name>
     <type>DataGrid</type>
@@ -214,6 +130,94 @@ public boolean processRow(StepMetaInterface smi, StepDataInterface sdi) throws K
      <cluster_schema/>
  <remotesteps>   <input>   </input>   <output>   </output> </remotesteps>    <GUI>
       <xloc>320</xloc>
+      <yloc>326</yloc>
+      <draw>Y</draw>
+      </GUI>
+    </step>
+
+  <step>
+    <name>Max String Length</name>
+    <type>UserDefinedJavaClass</type>
+    <description/>
+    <distribute>Y</distribute>
+    <custom_distribution/>
+    <copies>1</copies>
+         <partitioning>
+           <method>none</method>
+           <schema_name/>
+           </partitioning>
+
+    <definitions>
+        <definition>
+        <class_type>TRANSFORM_CLASS</class_type>
+
+        <class_name>Processor</class_name>
+
+        <class_source><![CDATA[import java.util.Map;
+import java.util.HashMap;
+import org.pentaho.di.core.row.value.ValueMetaString;
+
+Map maxValues;
+
+public boolean processRow( StepMetaInterface smi, StepDataInterface sdi ) throws KettleException {
+  Object[] r = getRow();
+
+  if ( r == null ) {
+    // We recieved rows, and we've processed every row already
+    // Output the results to the log
+    if ( getInputRowMeta() != null ) {
+      for ( int i = 0; i < getInputRowMeta().size(); i++ ) {
+        ValueMetaInterface vMeta = getInputRowMeta().getValueMeta( i );
+        String fieldName = vMeta.getName();
+        Object max = maxValues.get( i );
+        Object displayValue = ( vMeta instanceof ValueMetaString ) ? max + " (length)" : max;
+        String logMessage = String.format("%s: %s", new Object[] { fieldName, displayValue } );
+        logBasic( logMessage );
+      }
+    }
+
+    setOutputDone();
+    return false;
+  }
+
+  if ( first ){
+    first = false;
+    maxValues = new HashMap( getInputRowMeta().size(), 1.0f );
+  }
+
+  for ( int i = 0; i < getInputRowMeta().size(); i++ ) {
+    ValueMetaInterface vMeta = getInputRowMeta().getValueMeta( i );
+    Object currValue = vMeta.getNativeDataType( r[i] );
+    Object storedValue = maxValues.get( i );
+
+    boolean storeCurrValue = false;
+    if ( vMeta instanceof ValueMetaString && currValue != null ) {
+      currValue = ( (String) currValue ).length();
+      if ( storedValue == null && currValue != null ) {
+        storeCurrValue = true;
+      } else if ( storedValue != null && currValue != null ) {
+        storeCurrValue = ( (Integer) currValue > (Integer) storedValue );
+      }
+    } else {
+      storeCurrValue = ( vMeta.compare( currValue, storedValue ) > 0 );
+    }
+
+    if ( storeCurrValue ) {
+      maxValues.put( i, currValue );
+    }
+  }
+
+  putRow( data.outputRowMeta, r );
+  return true;
+}
+]]></class_source>
+        </definition>
+    </definitions>
+    <fields>
+    </fields><clear_result_fields>N</clear_result_fields>
+<info_steps></info_steps><target_steps></target_steps><usage_parameters></usage_parameters>     <cluster_schema/>
+ <remotesteps>   <input>   </input>   <output>   </output> </remotesteps>    <GUI>
+      <xloc>448</xloc>
       <yloc>326</yloc>
       <draw>Y</draw>
       </GUI>
